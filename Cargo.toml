@@ -1,0 +1,20 @@
+cargo-features = ["panic-immediate-abort"]
+[package]
+name = "nicyrtdyn"
+version = "0.0.1"
+edition = "2024"
+
+[lib]
+name = "nicyrtdyn"
+crate-type = ["cdylib"]
+
+[dependencies]
+libloading = "0.9"
+mlua-sys = { version = "0.10", features = ["luau", "vendored"] }
+
+[profile.release]
+panic = "immediate-abort" 
+strip = "none"
+lto = true
+codegen-units = 1
+opt-level = "z"
