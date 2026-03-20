@@ -12,6 +12,7 @@ use mlua_sys::luau::lauxlib;
 use mlua_sys::luau::lua;
 use mlua_sys::luau::lualib;
 use std::ffi::CStr;
+use std::ffi::CString;
 use std::fs;
 use std::os::raw::{c_char, c_int};
 use std::panic::{catch_unwind, AssertUnwindSafe};
@@ -184,7 +185,7 @@ unsafe extern "C-unwind" fn nicy_runtime_loadlib(l: *mut LuauState) -> c_int {
 unsafe fn push_nicy_table(l: *mut LuauState, native_enabled: bool, entry_path: &PathBuf) {
     unsafe { lua::lua_createtable(l, 0, 3) };
 
-    unsafe { compat::lua_pushstring(l, b"0.0.1\0".as_ptr() as *const c_char) };
+    unsafe { compat::lua_pushstring(l, b"0.0.2\0".as_ptr() as *const c_char) };
     unsafe { lua::lua_setfield(l, -2, b"version\0".as_ptr() as *const c_char) };
 
     unsafe { lua::lua_pushboolean(l, native_enabled as c_int) };
@@ -322,4 +323,161 @@ pub extern "C" fn nicy_start(path_ptr: *const c_char) {
             lua::lua_close(l);
         }
     }));
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn nicy_eval(code_ptr: *const c_char) {
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        if code_ptr.is_null() {
+            eprintln!("[nicyrtdyn] Error: code_ptr is null");
+            return;
+        }
+
+        let c_str = unsafe { CStr::from_ptr(code_ptr) };
+        let code_str = match c_str.to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                eprintln!("[nicyrtdyn] Error: invalid code encoding");
+                return;
+            }
+        };
+
+        unsafe {
+            let l = lauxlib::luaL_newstate();
+            if l.is_null() {
+                eprintln!("[nicyrtdyn] Failed to create Luau state for eval");
+                return;
+            }
+
+            lualib::luaL_openlibs(l);
+            push_nicy_table(l, false, &PathBuf::from("eval"));
+
+            let chunkname = b"eval\0";
+            let load_status = compat::luaL_loadbuffer(
+                l,
+                code_str.as_ptr() as *const c_char,
+                code_str.as_bytes().len(),
+                chunkname.as_ptr() as *const c_char,
+            );
+
+            if load_status != 0 {
+                let err = lua::lua_tostring(l, -1);
+                if !err.is_null() {
+                    eprintln!("[LUAU EVAL COMPILE ERROR] {}", CStr::from_ptr(err).to_string_lossy());
+                } else {
+                    eprintln!("[LUAU EVAL COMPILE ERROR] unknown");
+                }
+                lua::lua_close(l);
+                return;
+            }
+
+            let call_status = lua::lua_pcall(l, 0, 0, 0);
+            if call_status != 0 {
+                let err = lua::lua_tostring(l, -1);
+                if !err.is_null() {
+                    eprintln!("[LUAU EVAL RUNTIME ERROR] {}", CStr::from_ptr(err).to_string_lossy());
+                } else {
+                    eprintln!("[LUAU EVAL RUNTIME ERROR] unknown");
+                }
+            }
+
+            lua::lua_close(l);
+        }
+    }));
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn nicy_compile(path_ptr: *const c_char) {
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        if path_ptr.is_null() {
+            eprintln!("[nicyrtdyn] Error: path_ptr is null");
+            return;
+        }
+
+        let c_str = unsafe { CStr::from_ptr(path_ptr) };
+        let path_str = match c_str.to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                eprintln!("[nicyrtdyn] Error: invalid path encoding");
+                return;
+            }
+        };
+
+        let entry_path = match fs::canonicalize(path_str) {
+            Ok(p) => p,
+            Err(_) => PathBuf::from(path_str),
+        };
+
+        let code = match fs::read_to_string(&entry_path) {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!("[nicyrtdyn] Compile Error reading file: {}", e);
+                return;
+            }
+        };
+
+        unsafe {
+            let mut chunkname = entry_path.to_string_lossy().as_bytes().to_vec();
+            for b in &mut chunkname {
+                if *b == 0 {
+                    *b = b'?';
+                }
+            }
+            chunkname.push(0);
+
+            let options = mlua_sys::luau::lua_CompileOptions::default();
+            let bytecode_result = mlua_sys::luau::luau_compile(
+                code.as_bytes(),
+                options,
+            );
+
+            if bytecode_result.is_empty() {
+                eprintln!("[LUAU COMPILE ERROR] Failed to generate bytecode (syntax error?)");
+                return;
+            }
+
+            let out_path = entry_path.with_extension("luauc");
+            if let Err(e) = fs::write(&out_path, &bytecode_result) {
+                eprintln!("[LUAU COMPILE ERROR] Failed to save bytecode to {}: {}", out_path.display(), e);
+            } else {
+                println!("[NICY] Bytecode successfully compiled to {}", out_path.display());
+            }
+        }
+    }));
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn nicy_version() -> *const c_char {
+    b"Nicy Runtime 0.0.2\0".as_ptr() as *const c_char
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn nicy_luau_version() -> *const c_char {
+    static LUAU_VERSION: OnceLock<CString> = OnceLock::new();
+
+    let c_str = LUAU_VERSION.get_or_init(|| {
+        unsafe {
+            let l = lauxlib::luaL_newstate();
+            if l.is_null() {
+                return CString::new("Luau (Fallback)").unwrap();
+            }
+
+            lualib::luaL_openlibs(l);
+
+            lua::lua_getglobal(l, b"_VERSION\0".as_ptr() as *const c_char);
+            
+            let p = lua::lua_tostring(l, -1);
+            let version_str = if !p.is_null() {
+                std::ffi::CStr::from_ptr(p).to_owned()
+            } else {
+                CString::new("Luau (Unknown)").unwrap()
+            };
+            
+            lua::lua_close(l);
+            
+            version_str
+        }
+    });
+
+    c_str.as_ptr()
 }

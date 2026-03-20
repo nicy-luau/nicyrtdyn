@@ -67,6 +67,20 @@ The library is structured into several modules:
 - `task_scheduler.rs`: The asynchronous task scheduler.
 - `ffi_exports.rs`: C-ABI compatible functions for FFI.
 
+## 🛠️ Exported C-ABI Methods (Host API)
+
+The `nicyrtdyn` shared library exposes the following `extern "C"` functions. This makes it incredibly easy to embed the Nicy Luau Runtime into any programming language (C#, Python, Node.js, etc.).
+
+* **`void nicy_start(const char* filepath)`** **The Main Engine:** Initializes the complete runtime environment, sets up the task scheduler and custom `require` resolver, and executes the `.luau` script at the specified path.
+
+* **`void nicy_eval(const char* code)`** **The Quick Executor:** Instantly evaluates and executes a raw string of Luau code in an isolated state. Perfect for REPLs, debugging, or on-the-fly execution.
+
+* **`void nicy_compile(const char* filepath)`** **The Bytecode Generator:** Reads the source file, compiles it into highly optimized Luau bytecode, and saves it to disk as a `.luauc` file. *(Note: This does not execute the code).*
+
+* **`const char* nicy_version()`** **Version Info:** Returns a pointer to a null-terminated string containing the Nicy Runtime version (e.g., "Nicy Runtime 0.0.2").
+
+* **`const char* nicy_luau_version()`** **Luau Version:** Returns a pointer to a null-terminated string containing the Luau engine version (e.g., "Luau").
+
 ## FFI C-ABI Exports
 
 The following functions are exported with C-ABI compatibility for use in native modules:
