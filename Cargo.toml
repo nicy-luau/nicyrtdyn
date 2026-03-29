@@ -1,0 +1,19 @@
+[package]
+name = "nicyrtdyn"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "nicyrtdyn"
+crate-type = ["cdylib"]
+
+[dependencies]
+libloading = "0.9"
+mlua-sys = { version = "0.10", default-features = false, features = ["luau", "luau-codegen", "vendored"] }
+
+[profile.release]
+panic = "abort"
+strip = "symbols"
+lto = true
+codegen-units = 1
+opt-level = "z"
