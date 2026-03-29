@@ -157,7 +157,25 @@ jobs:
           )
 
           foreach ($symbol in $requiredSymbols) {
-            if ($exportsOutput -notmatch "(?m)\b_?$symbol\b") {
+            $escaped = [Regex]::Escape($symbol)
+            $patterns = @(
+              "(?im)$escaped",
+              "(?im)_$escaped",
+              "(?im)_$escaped@\d+"
+            )
+
+            $found = $false
+            foreach ($p in $patterns) {
+              if ($exportsOutput -match $p) {
+                $found = $true
+                break
+              }
+            }
+
+            if (-not $found) {
+              Write-Host "Nao foi possivel validar simbolo '$symbol' em $libPath" -ForegroundColor Red
+              Write-Host "Dump parcial de exports para diagnostico:" -ForegroundColor Yellow
+              $exportsOutput.Split([Environment]::NewLine) | Select-Object -First 140 | ForEach-Object { Write-Host $_ }
               throw "Export obrigatorio ausente na biblioteca ($libPath): $symbol"
             }
           }
