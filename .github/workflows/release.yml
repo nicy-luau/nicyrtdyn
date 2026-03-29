@@ -214,7 +214,7 @@ jobs:
           files: dist/*.zip
           fail_on_unmatched_files: true
           body: |
-            nicyrtdyn runtime ${{ github.ref_name }} (0.1.1)
+            nicyrtdyn runtime ${{ github.ref_name }} (0.1.0)
             - rust toolchain: stable
             - no binary compression
             - artifacts: zip per target with canonical library name inside

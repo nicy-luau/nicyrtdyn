@@ -14,6 +14,15 @@ rustflags = ["-C", "target-feature=+crt-static"]
 [target.aarch64-pc-windows-msvc]
 rustflags = ["-C", "target-feature=+crt-static"]
 
+[target.x86_64-pc-windows-gnu]
+rustflags = ["-C", "link-arg=-Wl,--export-all-symbols", "-C", "lto=off"]
+
+[target.i686-pc-windows-gnu]
+rustflags = ["-C", "link-arg=-Wl,--export-all-symbols", "-C", "lto=off"]
+
+[target.aarch64-pc-windows-gnullvm]
+rustflags = ["-C", "link-arg=-Wl,--export-all-symbols", "-C", "lto=off"]
+
 [target.aarch64-apple-darwin]
 # Esse "-Wl,-x" diz pro linker do Mac: "Apaga os símbolos locais, parça!"
 rustflags = ["-C", "link-arg=-Wl,-x"]

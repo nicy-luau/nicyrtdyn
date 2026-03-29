@@ -77,7 +77,7 @@ The `nicyrtdyn` shared library exposes the following `extern "C"` functions. Thi
 
 * **`void nicy_compile(const char* filepath)`** **The Bytecode Generator:** Reads the source file, compiles it into highly optimized Luau bytecode, and saves it to disk as a `.luauc` file. *(Note: This does not execute the code).*
 
-* **`const char* nicy_version()`** **Version Info:** Returns a pointer to a null-terminated string containing the Nicy Runtime version (e.g., "Nicy Runtime 0.1.1").
+* **`const char* nicy_version()`** **Version Info:** Returns a pointer to a null-terminated string containing the Nicy Runtime version (e.g., "Nicy Runtime 0.1.0").
 
 * **`const char* nicy_luau_version()`** **Luau Version:** Returns a pointer to a null-terminated string containing the Luau engine version (e.g., "Luau").
 
